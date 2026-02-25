@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-purple: #7C3AED;
+  --primary-green: #10B981;
+  --bg-dark: #0F172A;
+  --accent: #F59E0B;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
+
+/* Sticky CTA bar */
+.sticky-cta {
+  @apply fixed bottom-0 left-0 right-0 z-50 flex justify-center gap-3 bg-slate-900/95 backdrop-blur border-t border-slate-700 py-3 px-4 shadow-lg;
+}
