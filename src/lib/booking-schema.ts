@@ -42,7 +42,7 @@ export const bookingSchema = z.object({
 export type BookingPayload = z.infer<typeof bookingSchema>;
 
 export function fieldErrorsFromZod(
-  result: z.SafeParseError<BookingPayload>
+  result: { success: false; error: z.ZodError<BookingPayload> }
 ): Partial<Record<keyof BookingPayload, string>> {
   const out: Partial<Record<keyof BookingPayload, string>> = {};
   for (const issue of result.error.issues) {

@@ -3,17 +3,21 @@
 import { FormEvent, useState } from "react";
 import { motion } from "framer-motion";
 import { Section } from "./Section";
+import {
+  bookingSchema,
+  fieldErrorsFromZod,
+  type BookingPayload,
+} from "@/lib/booking-schema";
+import { site } from "@/data/content";
 
-const eventTypes = [
-  { value: "", label: "Event type" },
+const eventOptions: { value: BookingPayload["eventType"]; label: string }[] = [
   { value: "corporate", label: "Corporate" },
   { value: "college", label: "College / fest" },
   { value: "private", label: "Private party" },
   { value: "other", label: "Other" },
 ];
 
-const budgets = [
-  { value: "", label: "Budget range" },
+const budgetOptions: { value: BookingPayload["budget"]; label: string }[] = [
   { value: "under-50k", label: "Under ₹50,000" },
   { value: "50k-1.5L", label: "₹50,000 – ₹1,50,000" },
   { value: "1.5L-3L", label: "₹1,50,000 – ₹3,00,000" },
@@ -21,12 +25,91 @@ const budgets = [
   { value: "unsure", label: "Not sure yet" },
 ];
 
+const inputClass =
+  "w-full rounded-xl border bg-stage-bg px-4 py-3.5 text-white placeholder:text-zinc-600 transition-shadow focus:outline-none focus:ring-2";
+const inputNormal = `${inputClass} border-white/10 focus:border-spotlight/50 focus:ring-spotlight/30`;
+const inputError = `${inputClass} border-rose-500/60 focus:border-rose-500 focus:ring-rose-500/30`;
+
 export function BookingSection() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [eventType, setEventType] = useState<string>("");
+  const [budget, setBudget] = useState<string>("");
+  const [message, setMessage] = useState("");
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof BookingPayload, string>>
+  >({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSubmitted(true);
+    setFormError(null);
+
+    const payload = {
+      name,
+      email,
+      eventType,
+      budget,
+      message,
+    };
+
+    const parsed = bookingSchema.safeParse(payload);
+    if (!parsed.success) {
+      setErrors(fieldErrorsFromZod(parsed));
+      return;
+    }
+
+    setErrors({});
+    setPending(true);
+
+    try {
+      const res = await fetch("/api/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        fieldErrors?: Partial<Record<keyof BookingPayload, string>>;
+        error?: string;
+      };
+
+      if (res.status === 422 && data.fieldErrors) {
+        setErrors(data.fieldErrors);
+        return;
+      }
+
+      if (res.status === 503 && data.error === "ONLINE_BOOKING_UNAVAILABLE") {
+        setFormError(
+          `Online booking isn’t set up yet. Please email ${site.email} with your event details.`
+        );
+        return;
+      }
+
+      if (!res.ok || !data.ok) {
+        setFormError(
+          data.error ||
+            `Something went wrong. Please try again or email ${site.email}.`
+        );
+        return;
+      }
+
+      setSubmitted(true);
+      setName("");
+      setEmail("");
+      setEventType("");
+      setBudget("");
+      setMessage("");
+    } catch {
+      setFormError(
+        `Network error. Check your connection or email ${site.email} directly.`
+      );
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -67,107 +150,169 @@ export function BookingSection() {
           >
             {submitted ? (
               <p className="py-8 text-center text-zinc-300" role="status">
-                Thanks — your request is in. We&apos;ll reply within 24 hours.
-                <span className="mt-2 block text-sm text-zinc-500">
-                  (Demo: wire this form to your email or CRM.)
-                </span>
+                Thanks — your request was sent. We&apos;ll reply within 24 hours.
               </p>
             ) : (
               <>
+                {formError && (
+                  <p
+                    className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-200"
+                    role="alert"
+                  >
+                    {formError}
+                  </p>
+                )}
+
                 <div>
-                  <label htmlFor="book-name" className="sr-only">
-                    Name
+                  <label
+                    htmlFor="book-name"
+                    className="mb-1.5 block text-xs font-medium text-zinc-400"
+                  >
+                    Name <span className="text-rose-400">*</span>
                   </label>
                   <input
                     id="book-name"
                     name="name"
                     type="text"
-                    required
                     autoComplete="name"
-                    placeholder="Name"
-                    className="w-full rounded-xl border border-white/10 bg-stage-bg px-4 py-3.5 text-white placeholder:text-zinc-600 transition-shadow focus:border-spotlight/50 focus:outline-none focus:ring-2 focus:ring-spotlight/30"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby={errors.name ? "book-name-err" : undefined}
+                    className={errors.name ? inputError : inputNormal}
                   />
+                  {errors.name && (
+                    <p id="book-name-err" className="mt-1.5 text-sm text-rose-400">
+                      {errors.name}
+                    </p>
+                  )}
                 </div>
+
                 <div>
-                  <label htmlFor="book-email" className="sr-only">
-                    Email
+                  <label
+                    htmlFor="book-email"
+                    className="mb-1.5 block text-xs font-medium text-zinc-400"
+                  >
+                    Email <span className="text-rose-400">*</span>
                   </label>
                   <input
                     id="book-email"
                     name="email"
                     type="email"
-                    required
                     autoComplete="email"
-                    placeholder="Email"
-                    className="w-full rounded-xl border border-white/10 bg-stage-bg px-4 py-3.5 text-white placeholder:text-zinc-600 transition-shadow focus:border-spotlight/50 focus:outline-none focus:ring-2 focus:ring-spotlight/30"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? "book-email-err" : undefined}
+                    className={errors.email ? inputError : inputNormal}
                   />
+                  {errors.email && (
+                    <p id="book-email-err" className="mt-1.5 text-sm text-rose-400">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="book-type" className="sr-only">
-                      Event type
+                    <label
+                      htmlFor="book-type"
+                      className="mb-1.5 block text-xs font-medium text-zinc-400"
+                    >
+                      Event type <span className="text-rose-400">*</span>
                     </label>
                     <select
                       id="book-type"
                       name="eventType"
-                      required
-                      defaultValue=""
-                      className="w-full rounded-xl border border-white/10 bg-stage-bg px-4 py-3.5 text-white transition-shadow focus:border-spotlight/50 focus:outline-none focus:ring-2 focus:ring-spotlight/30"
+                      value={eventType}
+                      onChange={(e) => setEventType(e.target.value)}
+                      aria-invalid={Boolean(errors.eventType)}
+                      aria-describedby={
+                        errors.eventType ? "book-type-err" : undefined
+                      }
+                      className={errors.eventType ? inputError : inputNormal}
                     >
-                      {eventTypes.map((o) => (
-                        <option
-                          key={o.value || "empty"}
-                          value={o.value}
-                          disabled={o.value === ""}
-                          className="bg-stage-bg"
-                        >
+                      <option value="">Select event type</option>
+                      {eventOptions.map((o) => (
+                        <option key={o.value} value={o.value} className="bg-stage-bg">
                           {o.label}
                         </option>
                       ))}
                     </select>
+                    {errors.eventType && (
+                      <p id="book-type-err" className="mt-1.5 text-sm text-rose-400">
+                        {errors.eventType}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label htmlFor="book-budget" className="sr-only">
-                      Budget range
+                    <label
+                      htmlFor="book-budget"
+                      className="mb-1.5 block text-xs font-medium text-zinc-400"
+                    >
+                      Budget range <span className="text-rose-400">*</span>
                     </label>
                     <select
                       id="book-budget"
                       name="budget"
-                      required
-                      defaultValue=""
-                      className="w-full rounded-xl border border-white/10 bg-stage-bg px-4 py-3.5 text-white transition-shadow focus:border-spotlight/50 focus:outline-none focus:ring-2 focus:ring-spotlight/30"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      aria-invalid={Boolean(errors.budget)}
+                      aria-describedby={
+                        errors.budget ? "book-budget-err" : undefined
+                      }
+                      className={errors.budget ? inputError : inputNormal}
                     >
-                      {budgets.map((o) => (
-                        <option
-                          key={o.value || "empty-b"}
-                          value={o.value}
-                          disabled={o.value === ""}
-                          className="bg-stage-bg"
-                        >
+                      <option value="">Select budget</option>
+                      {budgetOptions.map((o) => (
+                        <option key={o.value} value={o.value} className="bg-stage-bg">
                           {o.label}
                         </option>
                       ))}
                     </select>
+                    {errors.budget && (
+                      <p id="book-budget-err" className="mt-1.5 text-sm text-rose-400">
+                        {errors.budget}
+                      </p>
+                    )}
                   </div>
                 </div>
+
                 <div>
-                  <label htmlFor="book-message" className="sr-only">
-                    Message
+                  <label
+                    htmlFor="book-message"
+                    className="mb-1.5 block text-xs font-medium text-zinc-400"
+                  >
+                    Message <span className="text-rose-400">*</span>
                   </label>
                   <textarea
                     id="book-message"
                     name="message"
-                    required
                     rows={4}
                     placeholder="Tell us about your event (date, city, audience)…"
-                    className="w-full resize-y rounded-xl border border-white/10 bg-stage-bg px-4 py-3.5 text-white placeholder:text-zinc-600 transition-shadow focus:border-spotlight/50 focus:outline-none focus:ring-2 focus:ring-spotlight/30"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    aria-invalid={Boolean(errors.message)}
+                    aria-describedby={
+                      errors.message ? "book-message-err" : undefined
+                    }
+                    className={errors.message ? inputError : inputNormal}
                   />
+                  {errors.message && (
+                    <p id="book-message-err" className="mt-1.5 text-sm text-rose-400">
+                      {errors.message}
+                    </p>
+                  )}
                 </div>
+
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-spotlight py-4 text-sm font-bold text-stage-bg transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  disabled={pending}
+                  className="w-full rounded-xl bg-spotlight py-4 text-sm font-bold text-stage-bg transition-transform enabled:hover:scale-[1.01] enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Request booking
+                  {pending ? "Sending…" : "Request booking"}
                 </button>
                 <p className="text-center text-xs text-zinc-500">
                   We&apos;ll get back within 24 hours.
