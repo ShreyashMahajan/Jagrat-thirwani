@@ -1,25 +1,40 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, DM_Sans } from "next/font/google";
+import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
-import StickyCTA from "@/components/StickyCTA";
+import { site } from "@/data/content";
 
-const spaceGrotesk = Space_Grotesk({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-inter",
+  display: "swap",
 });
 
-const dmSans = DM_Sans({
+const poppins = Poppins({
+  weight: ["600", "700"],
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-poppins",
+  display: "swap",
 });
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
 export const metadata: Metadata = {
-  title: "Jagrat Thirwani | Stand-up Comedian & Content Creator",
-  description:
-    "Book stand-up comedy shows or collaborate on content. 500+ live shows, 80M+ views, 6+ years experience. Corporate, family & private events.",
+  ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+  title: site.seoTitle,
+  description: site.seoDescription,
+  keywords: [
+    "Jagrat Thirwani",
+    "standup comedian Indore",
+    "Bhola-Bhala",
+    "standup comedy India",
+    "book comedian",
+    "corporate comedy",
+    "college fest comedian",
+  ],
   openGraph: {
-    title: "Jagrat Thirwani | Stand-up & Content Creator",
-    description: "Stand-up comedian and content creator. Book shows or work with me for brand collaborations.",
+    title: site.seoTitle,
+    description: site.seoDescription,
+    type: "website",
   },
 };
 
@@ -29,11 +44,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${dmSans.variable}`}>
-      <body className="font-sans">
-        {children}
-        <StickyCTA />
-      </body>
+    <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
+      <body className="font-sans min-h-screen">{children}</body>
     </html>
   );
 }
